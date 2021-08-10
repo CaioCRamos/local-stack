@@ -1,0 +1,40 @@
+version: "3"
+
+services:
+  localstack:
+    image: localstack/localstack
+    ports:
+      - '4566:4566'
+    environment: 
+      - SERVICES=iam,s3,sns,sqs
+      - DEBUG=1
+      - EDGE_PORT=4566
+
+  setup-localstack:
+    image: amazon/aws-cli
+    volumes:
+      - ./localstack:$PWD/localstack
+    environment:
+      - AWS_ACCESS_KEY_ID=teste
+      - AWS_SECRET_ACCESS_KEY=teste
+      - AWS_DEFAULT_REGION=us-east-1
+    entrypoint: /bin/sh -c
+    command: >
+      "
+        sleep 20
+
+        #Create bucket
+        aws --endpoint-url=http://localstack:4566 s3 mb s3://teste-bucket
+        aws --endpoint-url=http://localstack:4566 s3api put-bucket-acl --bucket teste-bucket --acl public-read
+
+        #Create IAM
+        aws --endpoint-url=http://localstack:4566 iam create-role --role-name super-role --assume-role-policy-document file://$PWD/localstack/iam_policy.json
+
+        #Create SNS topic
+        aws --endpoint-url=http://localstack:4566 sns create-topic --name teste-topic --output text
+        
+        #Create SQS queue
+        aws --endpoint-url=http://localstack:4566 sqs create-queue --queue-name teste-queue --output text
+      "
+    depends_on:
+      - localstack
